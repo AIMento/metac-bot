@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -707,25 +708,44 @@ if __name__ == "__main__":
     # Configure the bot. The `llms=` block below is commented out to use
     # whichever default models forecasting-tools picks based on your env vars;
     # uncomment and edit to pin specific models.
+    # Budget-capped setup (total spend cap ~$70 for the fall season):
+    # one research report, three forecasts from a mid-tier model, median aggregate
+    # (~$0.08/question). AskNews is free for bot makers; without its keys we fall
+    # back to a cheap model with OpenRouter web search.
+    has_asknews = all(
+        os.getenv(k) and os.getenv(k) != "REPLACE_ME"
+        for k in ("ASKNEWS_CLIENT_ID", "ASKNEWS_SECRET")
+    )
+    forecast_model = os.getenv("FORECAST_MODEL", "openrouter/anthropic/claude-sonnet-5.5")
+    cheap_model = os.getenv("CHEAP_MODEL", "openrouter/anthropic/claude-haiku-5.5")
     template_bot = FallTemplateBot2026(
         research_reports_per_question=1,
-        predictions_per_research_report=5,
+        predictions_per_research_report=3,
         use_research_summary_to_forecast=False,
         publish_reports_to_metaculus=publish_to_metaculus,
         folder_to_save_reports_to=None,
         skip_previously_forecasted_questions=True,
         extra_metadata_in_explanation=True,
-        # llms={
-        #     "default": GeneralLlm(
-        #         model="openrouter/openai/gpt-4o",
-        #         temperature=0.3,
-        #         timeout=40,
-        #         allowed_tries=2,
-        #     ),
-        #     "summarizer": "openai/gpt-4o-mini",
-        #     "researcher": "asknews/news-summaries",
-        #     "parser": "openai/gpt-4o-mini",
-        # },
+        llms={
+            "default": GeneralLlm(
+                model=forecast_model,
+                temperature=0.3,
+                timeout=120,
+                allowed_tries=2,
+            ),
+            "summarizer": cheap_model,
+            "researcher": (
+                "asknews/news-summaries"
+                if has_asknews
+                else GeneralLlm(
+                    model=f"{cheap_model}:online",
+                    temperature=0.2,
+                    timeout=120,
+                    allowed_tries=2,
+                )
+            ),
+            "parser": cheap_model,
+        },
     )
 
     # Per-mode tournament URL shown in the summary banner footer. These
