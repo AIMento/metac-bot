@@ -772,11 +772,15 @@ if __name__ == "__main__":
                 client.CURRENT_AI_COMPETITION_ID, return_exceptions=True
             )
         )
-        minibench_reports = asyncio.run(
-            template_bot.forecast_on_tournament(
-                client.CURRENT_MINIBENCH_ID, return_exceptions=True
+        # MiniBench pays far less per question than the seasonal tournament,
+        # so on a fixed LLM budget it is off unless RUN_MINIBENCH=true.
+        minibench_reports = []
+        if os.getenv("RUN_MINIBENCH", "false").lower() == "true":
+            minibench_reports = asyncio.run(
+                template_bot.forecast_on_tournament(
+                    client.CURRENT_MINIBENCH_ID, return_exceptions=True
+                )
             )
-        )
         forecast_reports = seasonal_tournament_reports + minibench_reports
     elif run_mode == "metaculus_cup":
         # The Metaculus Cup may be uninitialized near the start of a season
