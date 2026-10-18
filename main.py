@@ -727,13 +727,17 @@ if __name__ == "__main__":
         skip_previously_forecasted_questions=True,
         extra_metadata_in_explanation=True,
         llms={
+            # max_tokens caps each call: OpenRouter reserves credit for the
+            # full max_tokens up front, and the model default (65536) fails on
+            # a small balance and makes a runaway answer expensive.
             "default": GeneralLlm(
                 model=forecast_model,
                 temperature=0.3,
                 timeout=120,
                 allowed_tries=2,
+                max_tokens=8000,
             ),
-            "summarizer": cheap_model,
+            "summarizer": GeneralLlm(model=cheap_model, temperature=0, max_tokens=4000),
             "researcher": (
                 "asknews/news-summaries"
                 if has_asknews
@@ -742,9 +746,10 @@ if __name__ == "__main__":
                     temperature=0.2,
                     timeout=120,
                     allowed_tries=2,
+                    max_tokens=4000,
                 )
             ),
-            "parser": cheap_model,
+            "parser": GeneralLlm(model=cheap_model, temperature=0, max_tokens=4000),
         },
     )
 
